@@ -5,3 +5,5 @@ data/processed/
 __pycache__/
 .vscode/
 *.pyc" 
+
+.venv
