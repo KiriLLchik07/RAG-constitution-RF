@@ -3,8 +3,8 @@ from typing import Any, Optional
 from langchain_ollama import OllamaLLM
 from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import StrOutputParser
-from prompt_engineering import create_constitution_prompt_template, create_system_prompt
-from retriever import ConstitutionRetriever
+from .prompt_engineering import create_constitution_prompt_template, create_system_prompt
+from .retriever import ConstitutionRetriever
 import time
 import json
 from pathlib import Path
@@ -86,7 +86,7 @@ class ConstitutionQA:
             "temperature": self.temperature
         }
         
-        with open("logs/interactions.jsonl", "a", encoding="utf-8") as f:
+        with open("data/logs/interactions.jsonl", "a", encoding="utf-8") as f:
             f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
     
     def answer_question(self, query: str, chat_history: Optional[list[BaseMessage]] = None,
