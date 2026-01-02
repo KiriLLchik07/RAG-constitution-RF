@@ -1,8 +1,8 @@
 import logging
 from typing import Any, Optional
-from langchain_community.llms import Ollama
-from langchain_classic.chains import LLMChain
+from langchain_ollama import OllamaLLM
 from langchain_core.messages import BaseMessage
+from langchain_core.output_parsers import StrOutputParser
 from prompt_engineering import create_constitution_prompt_template, create_system_prompt
 from retriever import ConstitutionRetriever
 import time
@@ -46,7 +46,7 @@ class ConstitutionQA:
         
         logger.info(f"Инициализация LLM: {model_name} с temperature={temperature}")
         
-        self.llm = Ollama(
+        self.llm = OllamaLLM(
             model=model_name,
             temperature=temperature,
             base_url="http://localhost:11434",
@@ -55,10 +55,10 @@ class ConstitutionQA:
         
         self.prompt_template = create_constitution_prompt_template()
         
-        self.qa_chain = LLMChain(
-            llm=self.llm,
-            prompt=self.prompt_template,
-            verbose=True
+        self.qa_chain = (
+            self.prompt_template
+            | self.llm
+            | StrOutputParser()
         )
         
         logger.info("Система вопросов и ответов успешно инициализирована")
@@ -120,11 +120,12 @@ class ConstitutionQA:
                 chat_history=chat_history
             )
             
-            response = None
+            response_text = None
             for attempt in range(self.max_retries):
                 try:
                     logger.info(f"Попытка {attempt + 1}/{self.max_retries} генерации ответа")
                     response = self.qa_chain.invoke(prompt_vars)
+                    response_text = response.strip() if isinstance(response, str) else str(response)
                     break
                 except Exception as e:
                     logger.warning(f"Попытка {attempt + 1} не удалась: {e}")
@@ -145,7 +146,7 @@ class ConstitutionQA:
             
             result = {
                 "query": query,
-                "answer": response["text"].strip() if response else "Не удалось получить ответ от LLM",
+                "answer": response_text or "Не удалось получить ответ от LLM",
                 "sources": sources,
                 "execution_time": execution_time,
                 "model": self.model_name,
@@ -213,7 +214,7 @@ LOG_DIR.mkdir(exist_ok=True)
 
 try:
     logger.info("Инициализация ретривера...")
-    retriever = ConstitutionRetriever(str(DB_PATH), use_reranker=False)
+    retriever = ConstitutionRetriever(str(DB_PATH), use_reranker=True)
     
     logger.info("Инициализация QA системы...")
     qa_system = ConstitutionQA(
