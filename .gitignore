@@ -11,3 +11,5 @@ __pycache__/
 
 data/raw/~$nstitutionrf.docx
 src/rag_constitution_rf.egg-info
+
+reports
