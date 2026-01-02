@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List, Dict, Any
 import chromadb
-from reranker import CrossEncoderReranker
+from .reranker import CrossEncoderReranker
 
 class ConstitutionRetriever:
     """
