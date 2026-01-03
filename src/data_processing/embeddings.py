@@ -17,7 +17,7 @@ def generate_embeddings(chunks_file_path: str, output_dir: str):
     with open(chunks_file_path, "r", encoding="utf-8") as f:
         chunks_metadata = json.load(f)
     
-    chunk_texts = [chunk["text_preview"].rstrip("...") for chunk in chunks_metadata]
+    chunk_texts = [chunk["full_text"] for chunk in chunks_metadata]
     print(f"Загружено {len(chunk_texts)} чанков для векторизации")
     
     print("\nЗагрузка модели sentence-transformers/all-MiniLM-L6-v2...")

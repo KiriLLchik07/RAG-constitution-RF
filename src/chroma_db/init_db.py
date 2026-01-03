@@ -58,7 +58,7 @@ def initialize_vector_db(chunks_metadata_path: str, embeddings_path: str, persis
     print(f"Коллекция '{collection_name}' создана")
         
     ids = [f"id_{i}" for i in range(len(chunks_metadata))]
-    documents = [chunk["text_preview"].rstrip("...") for chunk in chunks_metadata]
+    documents = [chunk["full_text"] for chunk in chunks_metadata]
     embeddings_list = embeddings.tolist()
     
     metadatas = []

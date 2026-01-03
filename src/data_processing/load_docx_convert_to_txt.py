@@ -1,6 +1,5 @@
 import docx
 from collections import defaultdict
-import os 
 
 doc = docx.Document("data/raw/constitutionrf.docx")
 

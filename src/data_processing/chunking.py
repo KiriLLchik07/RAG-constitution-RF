@@ -53,16 +53,23 @@ def chunk_constitution(text_path: str) -> list[Document]:
                 
             article_number = f"Статья {article_num_match.group(1)}"
             
-            full_text = f"{article_header}\n{article_content}"
-            
-            cleaned_text = re.sub(r'<\d+>.*?(?=\n|$)', '', full_text, flags=re.DOTALL)
-            cleaned_text = re.sub(r'<\*>.*?(?=\n|$)', '', cleaned_text, flags=re.DOTALL)
-            cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
-            
-            cleaned_text = re.sub(r'Статья\s+\d+(?:\.\d+)*\s*(\.\d+)', r'Статья \1', cleaned_text, count=1)
+            article_content_clean = re.sub(
+                r'^\s*Статья\s+\d+(?:\.\d+)*[^\n]*\n?',
+                '',
+                article_content,
+                count=1,
+                flags=re.IGNORECASE | re.MULTILINE
+            )
+
+            article_content_clean = re.sub(r'<\d+>.*?(?=\n|$)', '', article_content_clean, flags=re.DOTALL)
+            article_content_clean = re.sub(r'<\*>.*?(?=\n|$)', '', article_content_clean, flags=re.DOTALL)
+            article_content_clean = re.sub(r'\s+', ' ', article_content_clean).strip()
+
+            full_text = f"{article_header}\n{article_content_clean}"
+            full_text = re.sub(r'(\d+)\s*\.\s*', r'\1. ', full_text)
             
             chunks.append(Document(
-                page_content=cleaned_text,
+                page_content=full_text,
                 metadata={
                     "chapter": current_chapter,
                     "article_number": article_number,
@@ -79,26 +86,16 @@ METADATA_PATH = PROJECT_ROOT / "data" / "processed" / "chunks_metadata.json"
 
 chunks = chunk_constitution(str(TEXT_PATH))
 
-unique_articles = set()
-duplicates = []
+unique_chunks = {}
 for chunk in chunks:
     key = (chunk.metadata["chapter"], chunk.metadata["article_number"])
-    if key in unique_articles:
-        duplicates.append(key)
-    else:
-        unique_articles.add(key)
-
-if duplicates:
-    print(f"\nНайдены дубликаты статей ({len(duplicates)}):")
-    for chapter, article in duplicates[:5]:
-        print(f"  {chapter} - {article}")
-    if len(duplicates) > 5:
-        print(f"  ... и еще {len(duplicates)-5} дубликатов")
+    unique_chunks[key] = chunk
+chunks = list(unique_chunks.values())
 
 metadata = [{
     "chapter": chunk.metadata["chapter"],
     "article": chunk.metadata["article_number"],
-    "text_preview": chunk.page_content[:100] + "..." if len(chunk.page_content) > 100 else chunk.page_content
+    "full_text": chunk.page_content
 } for chunk in chunks]
 
 METADATA_PATH.parent.mkdir(parents=True, exist_ok=True)
