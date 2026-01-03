@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any
 import chromadb
+from sentence_transformers import SentenceTransformer
 from .reranker import CrossEncoderReranker
 
 class ConstitutionRetriever:
@@ -9,13 +10,14 @@ class ConstitutionRetriever:
     с поддержкой реранжирования
     """
     
-    def __init__(self, persist_directory: str, use_reranker: bool = True):
+    def __init__(self, persist_directory: str, use_reranker: bool = True, embedding_model_name: str = "deepvk/USER-bge-m3"):
         """
         Инициализация ретривера
         
         Args:
             persist_directory: Путь к директории с сохраненной векторной БД
             use_reranker: Флаг использования реранкера
+            embedding_model_name: Модель для векторизации запросов
         """
         self.persist_directory = Path(persist_directory)
         self.use_reranker = use_reranker
@@ -32,6 +34,8 @@ class ConstitutionRetriever:
             name="constitution_rag"
         )
         
+        self.embedding_model = SentenceTransformer(embedding_model_name)
+        
         if self.use_reranker:
             self.reranker = CrossEncoderReranker()
         else:
@@ -41,7 +45,7 @@ class ConstitutionRetriever:
         if self.use_reranker:
             print("Реранкер активирован для улучшения качества поиска")
     
-    def retrieve(self, query: str, n_initial: int = 10, n_final: int = 5) -> list[dict[str, Any]]:
+    def retrieve(self, query: str, n_initial: int = 10, n_final: int = 5, relevance_threshold: float = 0.5) -> list[dict[str, Any]]:
         """
         Поиск релевантных документов по запросу с реранжированием
         
@@ -53,8 +57,10 @@ class ConstitutionRetriever:
         Returns:
             Список релевантных документов с метаданными
         """
+        query_embedding = self.embedding_model.encode([query], normalize_embeddings=True).tolist()
+
         results = self.collection.query(
-            query_texts=[query],
+            query_embeddings=query_embedding,
             n_results=n_initial,
             include=["documents", "metadatas", "distances"]
         )
@@ -72,12 +78,11 @@ class ConstitutionRetriever:
             return []
         
         print(f"Найдено {len(retrieved_docs)} документов на первичном этапе для запроса: '{query}'")
-        
-        RELEVANCE_THRESHOLD = 0.0 
+         
         if self.use_reranker and hasattr(self, 'reranker'):
             reranked_docs = self.reranker.rerank(query, retrieved_docs.copy())
             top_score = reranked_docs[0]["rerank_score"]
-            if top_score < RELEVANCE_THRESHOLD:
+            if top_score < relevance_threshold:
                 return []
 
             return reranked_docs[:n_final]

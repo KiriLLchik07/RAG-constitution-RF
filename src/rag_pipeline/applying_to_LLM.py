@@ -149,7 +149,7 @@ class ConstitutionQA:
                 {
                     "article_number": doc["metadata"]["article_number"],
                     "chapter": doc["metadata"]["chapter"],
-                    "text_excerpt": doc["text"][:200] + "..." if len(doc["text"]) > 200 else doc["text"],
+                    "text_excerpt": doc["text"],
                     "score": doc.get("rerank_score", doc.get("score", 0))
                 }
                 for doc in documents
