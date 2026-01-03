@@ -1,29 +1,23 @@
 import json
-import numpy as np
 from pathlib import Path
 import chromadb
 from chromadb.utils import embedding_functions
 from chromadb.errors import NotFoundError
 from tqdm import tqdm
-import time
 
-def initialize_vector_db(chunks_metadata_path: str, embeddings_path: str, persist_directory: str):
+def initialize_vector_db(chunks_metadata_path: str, persist_directory: str):
     """
     Инициализация и заполнение векторной базы данных ChromaDB
     
     Args:
         chunks_metadata_path: Путь к файлу с метаданными чанков
-        embeddings_path: Путь к файлу с эмбеддингами
         persist_directory: Директория для сохранения векторной БД
     """
 
     with open(chunks_metadata_path, "r", encoding="utf-8") as f:
         chunks_metadata = json.load(f)
     
-    print("Загрузка эмбеддингов...")
-    embeddings = np.load(embeddings_path)
-    
-    print(f"Загружено {len(chunks_metadata)} чанков и их эмбеддингов")
+    print(f"Загружено {len(chunks_metadata)} чанков для векторизации")
     
     Path(persist_directory).mkdir(parents=True, exist_ok=True)
     
@@ -59,7 +53,6 @@ def initialize_vector_db(chunks_metadata_path: str, embeddings_path: str, persis
         
     ids = [f"id_{i}" for i in range(len(chunks_metadata))]
     documents = [chunk["full_text"] for chunk in chunks_metadata]
-    embeddings_list = embeddings.tolist()
     
     metadatas = []
     for chunk in chunks_metadata:
@@ -77,7 +70,6 @@ def initialize_vector_db(chunks_metadata_path: str, embeddings_path: str, persis
         end_idx = min(i + batch_size, len(ids))
         collection.add(
             ids=ids[i:end_idx],
-            embeddings=embeddings_list[i:end_idx],
             documents=documents[i:end_idx],
             metadatas=metadatas[i:end_idx]
         )
@@ -87,17 +79,13 @@ def initialize_vector_db(chunks_metadata_path: str, embeddings_path: str, persis
     
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 CHUNKS_METADATA_PATH = PROJECT_ROOT / "data" / "processed" / "chunks_metadata.json"
-EMBEDDINGS_PATH = PROJECT_ROOT / "data" / "processed" / "embeddings" / "embeddings.npy"
 PERSIST_DIRECTORY = PROJECT_ROOT / "data" / "vector_db" / "chroma_db"
 
 if not CHUNKS_METADATA_PATH.exists():
     raise FileNotFoundError(f"Файл метаданных не найден: {CHUNKS_METADATA_PATH}")
-if not EMBEDDINGS_PATH.exists():
-    raise FileNotFoundError(f"Файл эмбеддингов не найден: {EMBEDDINGS_PATH}")
 
 client, collection = initialize_vector_db(
     str(CHUNKS_METADATA_PATH),
-    str(EMBEDDINGS_PATH),
     str(PERSIST_DIRECTORY)
 )
 
