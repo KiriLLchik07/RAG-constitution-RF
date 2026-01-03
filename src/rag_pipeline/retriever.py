@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 import chromadb
 from .reranker import CrossEncoderReranker
 
@@ -41,7 +41,7 @@ class ConstitutionRetriever:
         if self.use_reranker:
             print("Реранкер активирован для улучшения качества поиска")
     
-    def retrieve(self, query: str, n_initial: int = 10, n_final: int = 5) -> List[Dict[str, Any]]:
+    def retrieve(self, query: str, n_initial: int = 10, n_final: int = 5) -> list[dict[str, Any]]:
         """
         Поиск релевантных документов по запросу с реранжированием
         
@@ -61,13 +61,20 @@ class ConstitutionRetriever:
         
         retrieved_docs = []
         for i in range(len(results["documents"][0])):
+            score = max(0.0, min(1.0, 1 - (results["distances"][0][i] / 2)))
             doc = {
                 "text": results["documents"][0][i],
                 "metadata": results["metadatas"][0][i],
                 "distance": results["distances"][0][i],
-                "score": 1 - (results["distances"][0][i] / 2)
+                "score": score
             }
             retrieved_docs.append(doc)
+        
+        if not retrieved_docs:
+            return "Нет релевантных документов для вашего запроса!"
+        
+        threshold = 0.3
+        retrieved_docs = [doc for doc in retrieved_docs if doc["score"] > threshold]
         
         print(f"Найдено {len(retrieved_docs)} документов на первичном этапе для запроса: '{query}'")
         
