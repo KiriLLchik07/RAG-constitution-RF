@@ -61,25 +61,25 @@ class ConstitutionRetriever:
         
         retrieved_docs = []
         for i in range(len(results["documents"][0])):
-            score = max(0.0, min(1.0, 1 - (results["distances"][0][i] / 2)))
             doc = {
                 "text": results["documents"][0][i],
                 "metadata": results["metadatas"][0][i],
                 "distance": results["distances"][0][i],
-                "score": score
             }
             retrieved_docs.append(doc)
         
         if not retrieved_docs:
-            return "Нет релевантных документов для вашего запроса!"
-        
-        threshold = 0.3
-        retrieved_docs = [doc for doc in retrieved_docs if doc["score"] > threshold]
+            return []
         
         print(f"Найдено {len(retrieved_docs)} документов на первичном этапе для запроса: '{query}'")
         
+        RELEVANCE_THRESHOLD = 0.0 
         if self.use_reranker and hasattr(self, 'reranker'):
             reranked_docs = self.reranker.rerank(query, retrieved_docs.copy())
+            top_score = reranked_docs[0]["rerank_score"]
+            if top_score < RELEVANCE_THRESHOLD:
+                return []
+
             return reranked_docs[:n_final]
         
         sorted_docs = sorted(retrieved_docs, key=lambda x: x["score"], reverse=True)

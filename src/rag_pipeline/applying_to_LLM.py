@@ -90,7 +90,7 @@ class ConstitutionQA:
             f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
     
     def answer_question(self, query: str, chat_history: Optional[list[BaseMessage]] = None,
-                        n_initial: int = 10, n_final: int = 5) -> dict[str, Any]:
+                        n_initial: int = 10, n_final: int = 5, relevance_threshold:float = 0.0) -> dict[str, Any]:
         """
         Ответ на вопрос пользователя по Конституции РФ
         
@@ -112,6 +112,17 @@ class ConstitutionQA:
                 n_initial=n_initial,
                 n_final=n_final
             )
+
+            if not documents:
+                return {
+                    "query": query,
+                    "answer": "В Конституции РФ нет информации по данному вопросу.",
+                    "sources": [],
+                    "execution_time": time.time() - start_time,
+                    "model": self.model_name,
+                    "temperature": self.temperature
+                }
+
             logger.info(f"Получено {len(documents)} релевантных документов")
             
             prompt_vars = create_system_prompt(
