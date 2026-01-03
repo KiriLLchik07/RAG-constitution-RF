@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 import chromadb
-from chromadb.utils import embedding_functions
 from chromadb.errors import NotFoundError
+from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
 def initialize_vector_db(chunks_metadata_path: str, persist_directory: str):
@@ -36,23 +36,29 @@ def initialize_vector_db(chunks_metadata_path: str, persist_directory: str):
         print(f"Удалена существующая коллекция '{collection_name}'")
     except NotFoundError:
         print(f"Коллекция '{collection_name}' не существует. Создаем новую...")
-    
-    embedding_func = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-        device="cpu"
-    )
-    
-    collection = client.create_collection(
-        name=collection_name,
-        embedding_function=embedding_func,
-        metadata={"hnsw:space": "cosine"},
-        get_or_create=True
-    )
-    
+
     print(f"Коллекция '{collection_name}' создана")
         
     ids = [f"id_{i}" for i in range(len(chunks_metadata))]
     documents = [chunk["full_text"] for chunk in chunks_metadata]
+
+    model = SentenceTransformer("deepvk/USER-bge-m3")
+
+    def embedding_fn(texts: list[str]) -> list[list[float]]:
+        embeddings = model.encode(
+            texts,
+            normalize_embeddings=True,
+            show_progress_bar=True
+        )
+        return embeddings.tolist()
+
+    
+    collection = client.create_collection(
+        name=collection_name,
+        embedding_function=embedding_fn,
+        metadata={"hnsw:space": "cosine"},
+        get_or_create=True
+    )
     
     metadatas = []
     for chunk in chunks_metadata:
