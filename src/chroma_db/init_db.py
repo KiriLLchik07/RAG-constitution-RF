@@ -1,32 +1,41 @@
 import json
-import numpy as np
 from pathlib import Path
 import chromadb
-from chromadb.utils import embedding_functions
 from chromadb.errors import NotFoundError
+from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
-import time
 
-def initialize_vector_db(chunks_metadata_path: str, embeddings_path: str, persist_directory: str):
+
+class SentenceTransformerEmbedding:
+    """Класс-обертка для SentenceTransformer, совместимый с ChromaDB """
+    def __init__(self, model_name: str):
+        self.model = SentenceTransformer(model_name)
+
+    def __call__(self, input: list[str]) -> list[list[float]]:
+        embeddings = self.model.encode(
+            input,
+            normalize_embeddings=True,
+            show_progress_bar=True
+        )
+        return embeddings.tolist()
+
+
+def initialize_vector_db(chunks_metadata_path: str, persist_directory: str):
     """
     Инициализация и заполнение векторной базы данных ChromaDB
-    
+
     Args:
         chunks_metadata_path: Путь к файлу с метаданными чанков
-        embeddings_path: Путь к файлу с эмбеддингами
         persist_directory: Директория для сохранения векторной БД
     """
 
     with open(chunks_metadata_path, "r", encoding="utf-8") as f:
         chunks_metadata = json.load(f)
-    
-    print("Загрузка эмбеддингов...")
-    embeddings = np.load(embeddings_path)
-    
-    print(f"Загружено {len(chunks_metadata)} чанков и их эмбеддингов")
-    
+
+    print(f"Загружено {len(chunks_metadata)} чанков для векторизации")
+
     Path(persist_directory).mkdir(parents=True, exist_ok=True)
-    
+
     client = chromadb.PersistentClient(
         path=persist_directory,
         settings=chromadb.Settings(
@@ -34,33 +43,28 @@ def initialize_vector_db(chunks_metadata_path: str, embeddings_path: str, persis
             allow_reset=True
         )
     )
-    
+
     collection_name = "constitution_rag"
-    
+
     try:
         client.delete_collection(collection_name)
         print(f"Удалена существующая коллекция '{collection_name}'")
     except NotFoundError:
         print(f"Коллекция '{collection_name}' не существует. Создаем новую...")
-    
-    embedding_func = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-        device="cpu"
-    )
-    
+
+    embedding_fn = SentenceTransformerEmbedding("deepvk/USER-bge-m3")
+
     collection = client.create_collection(
         name=collection_name,
-        embedding_function=embedding_func,
+        embedding_function=embedding_fn,
         metadata={"hnsw:space": "cosine"},
         get_or_create=True
     )
-    
     print(f"Коллекция '{collection_name}' создана")
-        
+
     ids = [f"id_{i}" for i in range(len(chunks_metadata))]
-    documents = [chunk["text_preview"].rstrip("...") for chunk in chunks_metadata]
-    embeddings_list = embeddings.tolist()
-    
+    documents = [chunk["full_text"] for chunk in chunks_metadata]
+
     metadatas = []
     for chunk in chunks_metadata:
         metadata = {
@@ -69,35 +73,30 @@ def initialize_vector_db(chunks_metadata_path: str, embeddings_path: str, persis
             "source": "Конституция РФ"
         }
         metadatas.append(metadata)
-    
+
     batch_size = 50
     total_batches = (len(ids) + batch_size - 1) // batch_size
-    
+
     for i in tqdm(range(0, len(ids), batch_size), desc="Заполнение БД", total=total_batches):
         end_idx = min(i + batch_size, len(ids))
         collection.add(
             ids=ids[i:end_idx],
-            embeddings=embeddings_list[i:end_idx],
             documents=documents[i:end_idx],
             metadatas=metadatas[i:end_idx]
         )
-    
+
     print(f"Векторная база данных успешно заполнена {len(ids)} документами")
     return client, collection
-    
+
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 CHUNKS_METADATA_PATH = PROJECT_ROOT / "data" / "processed" / "chunks_metadata.json"
-EMBEDDINGS_PATH = PROJECT_ROOT / "data" / "processed" / "embeddings" / "embeddings.npy"
 PERSIST_DIRECTORY = PROJECT_ROOT / "data" / "vector_db" / "chroma_db"
 
 if not CHUNKS_METADATA_PATH.exists():
     raise FileNotFoundError(f"Файл метаданных не найден: {CHUNKS_METADATA_PATH}")
-if not EMBEDDINGS_PATH.exists():
-    raise FileNotFoundError(f"Файл эмбеддингов не найден: {EMBEDDINGS_PATH}")
 
 client, collection = initialize_vector_db(
     str(CHUNKS_METADATA_PATH),
-    str(EMBEDDINGS_PATH),
     str(PERSIST_DIRECTORY)
 )
 

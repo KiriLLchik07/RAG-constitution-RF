@@ -8,6 +8,7 @@ from .retriever import ConstitutionRetriever
 import time
 import json
 from pathlib import Path
+from langchain_core.messages import HumanMessage, AIMessage
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,6 +55,7 @@ class ConstitutionQA:
         )
         
         self.prompt_template = create_constitution_prompt_template()
+        self.chat_history: list[BaseMessage] = []
         
         self.qa_chain = (
             self.prompt_template
@@ -89,7 +91,7 @@ class ConstitutionQA:
         with open("data/logs/interactions.jsonl", "a", encoding="utf-8") as f:
             f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
     
-    def answer_question(self, query: str, chat_history: Optional[list[BaseMessage]] = None,
+    def answer_question(self, query: str,
                         n_initial: int = 10, n_final: int = 5) -> dict[str, Any]:
         """
         Ответ на вопрос пользователя по Конституции РФ
@@ -112,12 +114,23 @@ class ConstitutionQA:
                 n_initial=n_initial,
                 n_final=n_final
             )
+
+            if not documents:
+                return {
+                    "query": query,
+                    "answer": "В Конституции РФ нет информации по данному вопросу.",
+                    "sources": [],
+                    "execution_time": time.time() - start_time,
+                    "model": self.model_name,
+                    "temperature": self.temperature
+                }
+
             logger.info(f"Получено {len(documents)} релевантных документов")
             
             prompt_vars = create_system_prompt(
                 query=query,
                 retrieved_docs=documents,
-                chat_history=chat_history
+                chat_history=self.chat_history
             )
             
             response_text = None
@@ -138,7 +151,7 @@ class ConstitutionQA:
                 {
                     "article_number": doc["metadata"]["article_number"],
                     "chapter": doc["metadata"]["chapter"],
-                    "text_excerpt": doc["text"][:200] + "..." if len(doc["text"]) > 200 else doc["text"],
+                    "text_excerpt": doc["text"],
                     "score": doc.get("rerank_score", doc.get("score", 0))
                 }
                 for doc in documents
@@ -152,6 +165,9 @@ class ConstitutionQA:
                 "model": self.model_name,
                 "temperature": self.temperature
             }
+            
+            self.chat_history.append(HumanMessage(content=query))
+            self.chat_history.append(AIMessage(content=response_text))
             
             context = prompt_vars["context"]
             self._log_interaction(

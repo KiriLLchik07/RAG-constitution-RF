@@ -46,7 +46,6 @@ class QuestionRequest(BaseModel):
     question: str
     n_initial: int = 10
     n_final: int = 5
-    chat_history: Optional[list[dict[str, Any]]] = None
 
 class AnswerResponse(BaseModel):
     query: str
@@ -73,7 +72,6 @@ async def ask_question(request: QuestionRequest):
     try:
         result = qa_system.answer_question(
             query=request.question,
-            chat_history=request.chat_history,
             n_initial=request.n_initial,
             n_final=request.n_final
         )
