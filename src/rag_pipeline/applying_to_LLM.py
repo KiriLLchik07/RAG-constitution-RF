@@ -8,6 +8,7 @@ from .retriever import ConstitutionRetriever
 import time
 import json
 from pathlib import Path
+from langchain_core.messages import HumanMessage, AIMessage
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,6 +55,7 @@ class ConstitutionQA:
         )
         
         self.prompt_template = create_constitution_prompt_template()
+        self.chat_history: list[BaseMessage] = []
         
         self.qa_chain = (
             self.prompt_template
@@ -89,8 +91,8 @@ class ConstitutionQA:
         with open("data/logs/interactions.jsonl", "a", encoding="utf-8") as f:
             f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
     
-    def answer_question(self, query: str, chat_history: Optional[list[BaseMessage]] = None,
-                        n_initial: int = 10, n_final: int = 5, relevance_threshold:float = 0.0) -> dict[str, Any]:
+    def answer_question(self, query: str,
+                        n_initial: int = 10, n_final: int = 5) -> dict[str, Any]:
         """
         Ответ на вопрос пользователя по Конституции РФ
         
@@ -128,7 +130,7 @@ class ConstitutionQA:
             prompt_vars = create_system_prompt(
                 query=query,
                 retrieved_docs=documents,
-                chat_history=chat_history
+                chat_history=self.chat_history
             )
             
             response_text = None
@@ -163,6 +165,9 @@ class ConstitutionQA:
                 "model": self.model_name,
                 "temperature": self.temperature
             }
+            
+            self.chat_history.append(HumanMessage(content=query))
+            self.chat_history.append(AIMessage(content=response_text))
             
             context = prompt_vars["context"]
             self._log_interaction(

@@ -79,16 +79,17 @@ class ConstitutionRetriever:
         
         print(f"Найдено {len(retrieved_docs)} документов на первичном этапе для запроса: '{query}'")
          
-        if self.use_reranker and hasattr(self, 'reranker'):
+        if self.use_reranker and self.reranker is not None:
             reranked_docs = self.reranker.rerank(query, retrieved_docs.copy())
-            top_score = reranked_docs[0]["rerank_score"]
-            if top_score < relevance_threshold:
+            filtered_docs = [
+                doc for doc in reranked_docs
+                if doc["rerank_score"] >= relevance_threshold
+            ]
+
+            if not filtered_docs:
                 return []
 
-            return reranked_docs[:n_final]
-        
-        sorted_docs = sorted(retrieved_docs, key=lambda x: x["score"], reverse=True)
-        return sorted_docs[:n_final]
+            return filtered_docs[:n_final]
     
     def get_context_for_llm(self, query: str, n_initial: int = 10, n_final: int = 5) -> str:
         """

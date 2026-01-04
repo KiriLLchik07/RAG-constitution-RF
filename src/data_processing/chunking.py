@@ -51,7 +51,7 @@ def chunk_constitution(text_path: str) -> list[Document]:
             if not article_num_match:
                 continue
                 
-            article_number = f"Статья {article_num_match.group(1)}"
+            article_number = article_num_match.group(1)
             
             article_content_clean = re.sub(
                 r'^\s*Статья\s+\d+(?:\.\d+)*[^\n]*\n?',
